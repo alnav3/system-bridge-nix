@@ -8,7 +8,7 @@ This repository provides a Nix flake for building and running [System Bridge](ht
 
 ```bash
 # Run System Bridge directly
-nix run github:alnav33/system-bridge-nix
+nix run github:alnav3/system-bridge-nix
 
 # Run the backend server
 nix run github:alnav3/system-bridge-nix -- backend
