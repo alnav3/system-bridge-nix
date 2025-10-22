@@ -5,210 +5,149 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
 
-    # Reference the main System Bridge repository
     system-bridge-src = {
       url = "github:timmo001/system-bridge";
-      flake = false;  # We don't want to use their flake, just the source
+      flake = false;
     };
   };
 
   outputs = { self, nixpkgs, flake-utils, system-bridge-src }:
     flake-utils.lib.eachDefaultSystem (system:
       let
-        pkgs = nixpkgs.legacyPackages.${system};
+        pkgs = import nixpkgs {
+          inherit system;
+        };
 
-        # Create a working System Bridge implementation
+        version = "5.0.0-dev";
+
+        robotgo-src = pkgs.fetchFromGitHub {
+          owner = "go-vgo";
+          repo = "robotgo";
+          rev = "v0.110.8";
+          hash = "sha256-XBNJ6l9d08ahprq9HkHg/h68EBWyfLkRpU1K5cufvZs=";
+        };
+
+        web-client = pkgs.runCommand "system-bridge-web-client-dummy" {} ''
+          mkdir -p $out
+          cat > $out/index.html << 'EOF'
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Bridge</title>
+</head>
+<body>
+    <h1>System Bridge</h1>
+    <p>System Bridge is running</p>
+</body>
+</html>
+EOF
+        '';
+
         system-bridge = pkgs.buildGoModule {
           pname = "system-bridge";
-          version = "4.1.4";
+          inherit version;
 
           src = system-bridge-src;
 
-          vendorHash = "sha256-v83Lhf3oCulKPMfl5HqAIhkRY5byvu4jMsGw/LnXVXw=";
-
-          # Add dummy web client to satisfy embed directive
-          postUnpack = ''
-            mkdir -p source/web-client/out
-            cat > source/web-client/out/index.html << 'EOF'
-            <!DOCTYPE html>
-            <html lang="en">
-            <head>
-                <meta charset="UTF-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>System Bridge</title>
-                <style>
-                    body {
-                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                        max-width: 800px;
-                        margin: 40px auto;
-                        padding: 20px;
-                        line-height: 1.6;
-                        color: #333;
-                    }
-                    .header {
-                        text-align: center;
-                        border-bottom: 1px solid #eee;
-                        padding-bottom: 20px;
-                        margin-bottom: 20px;
-                    }
-                    .status {
-                        background: #d4edda;
-                        border: 1px solid #c3e6cb;
-                        color: #155724;
-                        padding: 15px;
-                        border-radius: 5px;
-                        margin: 20px 0;
-                    }
-                    .feature {
-                        background: #f8f9fa;
-                        border-left: 4px solid #007bff;
-                        padding: 15px;
-                        margin: 10px 0;
-                    }
-                </style>
-            </head>
-            <body>
-                <div class="header">
-                    <h1>🌉 System Bridge</h1>
-                    <p>System Information and Control Interface</p>
-                </div>
-
-                <div class="status">
-                    ✅ System Bridge is running successfully via Nix!
-                </div>
-
-                <div class="feature">
-                    <h3>📊 System Information</h3>
-                    <p>Access real-time system metrics and information</p>
-                </div>
-
-                <div class="feature">
-                    <h3>🔌 API Access</h3>
-                    <p>REST API available for system integration</p>
-                </div>
-
-                <div class="feature">
-                    <h3>🔍 Built with Nix</h3>
-                    <p>Reproducible builds and remote deployment ready</p>
-                </div>
-
-                <div class="feature">
-                    <h3>📡 WebSocket Support</h3>
-                    <p>Real-time communication and updates</p>
-                </div>
-
-                <p style="text-align: center; margin-top: 40px; color: #666;">
-                    <small>System Bridge built and packaged with Nix flakes</small>
-                </p>
-            </body>
-            </html>
-            EOF
-
-            # Add basic static assets
-            mkdir -p source/web-client/out/static
-            echo "/* System Bridge CSS */" > source/web-client/out/static/app.css
-            echo "console.log('System Bridge loaded');" > source/web-client/out/static/app.js
-          '';
-
-          # Disable CGO to avoid robotgo compilation issues
-          env = {
-            CGO_ENABLED = "0";
-          };
-
-          # Build with no CGO to avoid complex dependencies
-          buildFlags = [ "-tags=nopkcs11" ];
-
-          # Patch out problematic robotgo dependencies
-          postPatch = ''
-            # Remove files that use robotgo to avoid compilation issues
-            find . -name "*.go" -type f -exec grep -l "github.com/go-vgo/robotgo" {} \; | while read -r file; do
-              echo "Removing file with robotgo dependency: $file"
-              rm -f "$file"
-            done
-
-            # Remove any test files that might cause package conflicts
-            find . -name "*_test.go" -delete
-
-            # Create stub handlers for removed functionality
-            mkdir -p utils/handlers/keyboard
-            cat > utils/handlers/keyboard/stub.go << 'EOF'
-            package keyboard
-
-
-
-            // KeypressData stub
-            type KeypressData struct {
-                Key       string   `json:"key"`
-                Modifiers []string `json:"modifiers"`
-            }
-
-            // Stub implementation for keyboard functionality
-            func TapKey(key string) error {
-                return nil
-            }
-
-            func ToggleKey(key string, down bool) error {
-                return nil
-            }
-
-            func SendKeypress(keypress KeypressData) error {
-                // Return nil to indicate success (no error)
-                return nil
-            }
-
-            func SendText(text string) error {
-                // Return nil to indicate success (no error)
-                return nil
-            }
-            EOF
-          '';
+          vendorHash = "sha256-UEZCeYX39Bl6qoT3C0QTums5SotznR5Lfl82yM/Dk00=";
 
           nativeBuildInputs = with pkgs; [
             pkg-config
           ];
 
-          # Basic build inputs for non-CGO build
           buildInputs = with pkgs; [
-            # Minimal dependencies for Go build
+            xorg.libX11
+            xorg.libXtst
+            xorg.libXinerama
+            xorg.libXcursor
+            xorg.libXrandr
+            xorg.libXi
+            xorg.libXext
+            xorg.libxcb
+            libpng
+            libjpeg
+            zlib
+            libGL
+            libGLU
+          ] ++ pkgs.lib.optionals pkgs.stdenv.hostPlatform.isLinux [
+            systemd
           ];
 
-          subPackages = [ "." ];
+          doCheck = false;
+
+          overrideModAttrs = _: {
+            postBuild = ''
+              if [ -d vendor/github.com/go-vgo/robotgo ]; then
+                chmod -R +w vendor/github.com/go-vgo/robotgo
+                for dir in base bitmap clipboard key mouse screen window; do
+                  cp -r "${robotgo-src}/$dir" vendor/github.com/go-vgo/robotgo/ || true
+                done
+              fi
+            '';
+          };
+
+          preBuild = ''
+            mkdir -p web-client/out
+            cp -r ${web-client}/* web-client/out/
+          '';
+
+          ldflags = [
+            "-X github.com/timmo001/system-bridge/version.Version=${version}"
+          ];
 
           meta = with pkgs.lib; {
-            description = "System Bridge - Complete system information and control application";
+            description = "A bridge for your systems - access system information and control via API/WebSocket";
             homepage = "https://github.com/timmo001/system-bridge";
-            license = licenses.asl20;
+            license = licenses.mit;
             maintainers = [ ];
-            platforms = platforms.linux ++ platforms.darwin;
+            platforms = platforms.linux;
             mainProgram = "system-bridge";
           };
         };
-
-      in {
+      in
+      {
         packages = {
           default = system-bridge;
           system-bridge = system-bridge;
+          web-client = web-client;
         };
 
-        # Development shell
+        apps.default = {
+          type = "app";
+          program = "${system-bridge}/bin/system-bridge";
+        };
+
         devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [
             go
-            nodejs_20
+            gopls
+            gotools
+            go-tools
+            nodejs_22
             bun
             pkg-config
-            gcc
+            xorg.libX11
+            xorg.libXtst
+            xorg.libXinerama
+            xorg.libXcursor
+            xorg.libXrandr
+            xorg.libXi
+            xorg.libXext
+            xorg.libxcb
+            libpng
+            libjpeg
+            systemd
           ];
 
           shellHook = ''
             echo "System Bridge development environment"
-            echo "Available commands:"
-            echo "  go run . - Run the backend"
-            echo "  cd web-client && bun run dev - Run the web client"
+            echo "Run 'make build' to build the application"
+            echo "Run 'make run' to build and run"
           '';
         };
 
-        # NixOS module
         nixosModules.default = { config, lib, pkgs, ... }:
           with lib;
           let
@@ -274,20 +213,17 @@
                   User = cfg.user;
                   Group = cfg.group;
 
-                  # Security settings
                   NoNewPrivileges = true;
                   PrivateTmp = true;
                   ProtectHome = true;
                   ProtectSystem = "strict";
                   ReadWritePaths = [ "/var/lib/system-bridge" ];
 
-                  # Runtime directory
                   RuntimeDirectory = "system-bridge";
                   RuntimeDirectoryMode = "0755";
                   StateDirectory = "system-bridge";
                   StateDirectoryMode = "0755";
 
-                  # Environment
                   Environment = [
                     "SYSTEM_BRIDGE_PORT=${toString cfg.port}"
                   ] ++ lib.optionals (cfg.settings != {}) [
@@ -295,14 +231,12 @@
                   ];
                 };
 
-                # Ensure the service starts after network is available
                 unitConfig = {
                   StartLimitIntervalSec = 60;
                   StartLimitBurst = 3;
                 };
               };
 
-              # Create user and group if using default
               users.users = mkIf (cfg.user == "system-bridge") {
                 system-bridge = {
                   isSystemUser = true;
@@ -317,15 +251,14 @@
                 system-bridge = {};
               };
 
-              # Open firewall if requested
               networking.firewall = mkIf cfg.openFirewall {
                 allowedTCPPorts = [ cfg.port ];
-                allowedUDPPorts = [ 1900 ]; # SSDP discovery
+                allowedUDPPorts = [ 1900 ];
               };
 
-              # Add system-bridge to PATH for all users
               environment.systemPackages = [ cfg.package ];
             };
           };
-      });
+      }
+    );
 }
