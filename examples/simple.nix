@@ -11,7 +11,7 @@
     nixosConfigurations.my-system = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
-        system-bridge-nix.nixosModules.default
+        system-bridge-nix.nixosModules.x86_64-linux.default
         {
           # Enable System Bridge service
           services.system-bridge.enable = true;
